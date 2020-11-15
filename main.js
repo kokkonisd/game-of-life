@@ -5,10 +5,12 @@
  */
 
 // Constants
-const cellSize = 10;
-const canvasX = 500;
-const canvasY = 500;
-const controlsHeight = 150;
+const CELL_SIZE = 10;
+const CANVAS_WIDTH = 500;
+const CANVAS_HEIGHT = 500;
+const CONTROLS_HEIGHT = 150;
+const STARTING_FRAMERATE = 2;
+const STARTING_PERCENTAGE = 15;
 
 // Canvas object
 let canvas;
@@ -32,18 +34,18 @@ let probabilitySlider;
  */
 function setup ()
 {
-    canvas = createCanvas(canvasX, canvasY + controlsHeight);
+    canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT + CONTROLS_HEIGHT);
     background('gray');
     textSize(17);
 
     // Create frame rate slider
-    frameRateSlider = createSlider(1, 100, 2, 1);
-    frameRateSlider.position(windowWidth / 2 - canvasX / 2 + 10,
-                             canvasY + 20);
+    frameRateSlider = createSlider(1, 100, STARTING_FRAMERATE, 1);
+    frameRateSlider.position(windowWidth / 2 - CANVAS_WIDTH / 2 + 10,
+                             CANVAS_HEIGHT + 20);
 
     // Create probability slider
-    probabilitySlider = createSlider(0, 100, 5, 1);
-    probabilitySlider.position(windowWidth / 2 - canvasX / 2 + 10,
+    probabilitySlider = createSlider(0, 100, STARTING_PERCENTAGE, 1);
+    probabilitySlider.position(windowWidth / 2 - CANVAS_WIDTH / 2 + 10,
                                frameRateSlider.position().y + 30);
 
     // Create reset button
@@ -63,10 +65,10 @@ function setup ()
 function windowResized ()
 {
     // Adjust the positions of the controls
-    frameRateSlider.position(windowWidth / 2 - canvasX / 2 + 10,
-                             canvasY + 20);
+    frameRateSlider.position(windowWidth / 2 - CANVAS_WIDTH / 2 + 10,
+                             CANVAS_HEIGHT + 20);
 
-    probabilitySlider.position(windowWidth / 2 - canvasX / 2 + 10,
+    probabilitySlider.position(windowWidth / 2 - CANVAS_WIDTH / 2 + 10,
                                frameRateSlider.position().y + 30);
 
     resetBtn.position(windowWidth / 2 - resetBtn.size().width / 2,
@@ -80,9 +82,9 @@ function windowResized ()
 function reset ()
 {
      // Fill array with cells
-    for (let i = 0; i < floor(canvasX / cellSize); i++) {
+    for (let i = 0; i < floor(CANVAS_WIDTH / CELL_SIZE); i++) {
         cells[i] = [];
-        for (let j = 0; j < floor(canvasY / cellSize); j++) {
+        for (let j = 0; j < floor(CANVAS_HEIGHT / CELL_SIZE); j++) {
             // Calculate a random number in [1, 100]
             let randomNum = floor(random(1, 101));
             // Cell is dead by default
@@ -94,7 +96,7 @@ function reset ()
             }
 
             // Create and show cell
-            cells[i][j] = new Cell(i * cellSize, j * cellSize, cellSize, alive);
+            cells[i][j] = new Cell(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE, alive);
             cells[i][j].display();
         }
     }
@@ -138,18 +140,22 @@ function drawSliderLabels()
 
     fill('black');
 
+    // Draw FPS text
     text('FPS:',
          frameRateSlider.position().x - canvas.position().x + frameRateSlider.size().width + 20,
          frameRateSlider.position().y + frameRateSlider.size().height);
 
+    // Draw FPS value
     text(str(frameRateSlider.value()),
          frameRateSlider.position().x - canvas.position().x + frameRateSlider.size().width + 63,
          frameRateSlider.position().y + frameRateSlider.size().height);
 
+    // Draw probability text
     text('Probability that a cell is alive at start:',
          probabilitySlider.position().x - canvas.position().x + probabilitySlider.size().width + 20,
          probabilitySlider.position().y + probabilitySlider.size().height);
 
+    // Draw probability value
     text(str(probabilitySlider.value()) + '%',
          probabilitySlider.position().x - canvas.position().x + probabilitySlider.size().width + 300,
          probabilitySlider.position().y + probabilitySlider.size().height);
@@ -166,49 +172,71 @@ function drawSliderLabels()
 function updateAndDrawCells ()
 {
     let allDead = false;
+    let newStates = [];
 
-    for (let i = 0; i < floor(canvasX / cellSize); i++) {
-        for (let j = 0; j < floor(canvasY / cellSize); j++) {
+    // Calculate new states of cells
+    for (let i = 0; i < floor(CANVAS_WIDTH / CELL_SIZE); i++) {
+        newStates[i] = [];
+        for (let j = 0; j < floor(CANVAS_HEIGHT / CELL_SIZE); j++) {
+            // Copy old states over
+            newStates[i][j] = cells[i][j].alive;
+            // Counter to count alive neighbors
             let aliveNeighbors = 0;
 
+            // Limiters to iterate over neighbors
             let startNeighborsX = i - 1;
             let endNeighborsX = i + 1;
             let startNeighborsY = j - 1;
             let endNeighborsY = j + 1;
 
+            // Set X limiters according to the left-right limits of the screen
             if (i == 0) {
                 startNeighborsX = 0;
-            } else if (i == floor(canvasX / cellSize) - 1) {
+            } else if (i == floor(CANVAS_WIDTH / CELL_SIZE) - 1) {
                 endNeighborsX = i;
             }
 
+            // Set Y limiters according to the top-bottom limits of the screen
             if (j == 0) {
                 startNeighborsY = 0;
-            } else if (j == floor(canvasY / cellSize) - 1) {
+            } else if (j == floor(CANVAS_HEIGHT / CELL_SIZE) - 1) {
                 endNeighborsY = j;
             }
 
+            // Count the neighbors that are currently alive
             for (let k = startNeighborsX; k <= endNeighborsX; k++) {
                 for (let l = startNeighborsY; l <= endNeighborsY; l++) {
-                    if (cells[k][l].alive) {
+                    if (!(k == i && l == j) && cells[k][l].alive === true) {
                         aliveNeighbors++;
                     }
                 }
             }
 
+            // Update cell state based on the following rules:
+            // 1. If cell is alive and has less than 2 or more than 3 alive neighbors, it dies
+            // 2. If cell is dead and has 3 alive neighbors, it comes to life
+            // 3. On other cases, cells retain their current status
             if (cells[i][j].alive) {
                 if (!(aliveNeighbors === 2 || aliveNeighbors === 3)) {
-                    cells[i][j].alive = false;
+                    newStates[i][j] = false;
                 }
             } else {
                 if (aliveNeighbors === 3) {
-                    cells[i][j].alive = true;
+                    newStates[i][j] = true;
                 }
             }
 
-            if (cells[i][j].alive) {
+            // If at least one cell is alive, there is no reason to stop the animation
+            if (newStates[i][j].alive) {
                 allDead = false;
             }
+        }
+    }
+
+    // Update cell states and display them
+    for (let i = 0; i < floor(CANVAS_WIDTH / CELL_SIZE); i++) {
+        for (let j = 0; j < floor(CANVAS_HEIGHT / CELL_SIZE); j++) {
+            cells[i][j].alive = newStates[i][j];
 
             cells[i][j].display();
         }
