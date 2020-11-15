@@ -171,7 +171,7 @@ function drawSliderLabels()
  */
 function updateAndDrawCells ()
 {
-    let allDead = false;
+    let allDead = true;
     let newStates = [];
 
     // Calculate new states of cells
@@ -227,7 +227,7 @@ function updateAndDrawCells ()
             }
 
             // If at least one cell is alive, there is no reason to stop the animation
-            if (newStates[i][j].alive) {
+            if (newStates[i][j]) {
                 allDead = false;
             }
         }
