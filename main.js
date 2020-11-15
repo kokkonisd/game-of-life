@@ -18,8 +18,8 @@ let canvas;
 // Cells array
 let cells = [];
 
-// Helper variable
-let cellsAreAllDead = false;
+// Helper variable to know when the animation has stalled, i.e. when the state of the board cannot change anymore
+let animationStalled = false;
 
 // Controls
 let frameRateSlider;
@@ -41,7 +41,7 @@ function setup ()
     // Create frame rate slider
     frameRateSlider = createSlider(1, 100, STARTING_FRAMERATE, 1);
     frameRateSlider.position(windowWidth / 2 - CANVAS_WIDTH / 2 + 10,
-                             CANVAS_HEIGHT + 20);
+                             CANVAS_HEIGHT + 40);
 
     // Create probability slider
     probabilitySlider = createSlider(0, 100, STARTING_PERCENTAGE, 1);
@@ -51,7 +51,7 @@ function setup ()
     // Create reset button
     resetBtn = createButton('Reset');
     resetBtn.position(windowWidth / 2 - resetBtn.size().width / 2,
-                      probabilitySlider.position().y + 50);
+                      probabilitySlider.position().y + 40);
     resetBtn.mousePressed(reset);
 
     // Start the animation
@@ -81,7 +81,10 @@ function windowResized ()
  */
 function reset ()
 {
-     // Fill array with cells
+    // Un-stall animation
+    animationStalled = false;
+
+    // Fill array with cells
     for (let i = 0; i < floor(CANVAS_WIDTH / CELL_SIZE); i++) {
         cells[i] = [];
         for (let j = 0; j < floor(CANVAS_HEIGHT / CELL_SIZE); j++) {
@@ -100,9 +103,6 @@ function reset ()
             cells[i][j].display();
         }
     }
-
-    // Enable looping
-    loop();
 }
 
 
@@ -120,13 +120,18 @@ function draw ()
     // Draw slider labels
     drawSliderLabels();
 
-    // Update & draw cells
-    cellsAreAllDead = updateAndDrawCells();
-
-    // If all cells are dead, stop the animation
-    if (cellsAreAllDead) {
-        noLoop();
-        console.log('All cells are dead!');
+    if (!animationStalled) {
+        // Update & draw cells
+        animationStalled = updateAndDrawCells();
+    } else {
+        // Simply draw the cells
+        drawCells();
+        // Draw text indicating the cell animation will no longer update
+        push();
+        fill('#910404'); // Deep red
+        textAlign(CENTER);
+        text("Either all cells are dead or can no longer mutate.", CANVAS_WIDTH / 2, CANVAS_HEIGHT + 20);
+        pop();
     }
 }
 
@@ -139,6 +144,8 @@ function drawSliderLabels()
     push();
 
     fill('black');
+
+    textAlign(LEFT, BOTTOM);
 
     // Draw FPS text
     text('FPS:',
@@ -167,11 +174,12 @@ function drawSliderLabels()
 /**
  * Updates and draws each cell.
  *
- * @return     {boolean}  Boolean value indicating wether or not all cells are now dead.
+ * @return     {boolean}  Boolean value indicating wether or not the animation has stalled, i.e. cells can no longer
+ *                        change.
  */
 function updateAndDrawCells ()
 {
-    let allDead = true;
+    let stalled = true;
     let newStates = [];
 
     // Calculate new states of cells
@@ -226,9 +234,9 @@ function updateAndDrawCells ()
                 }
             }
 
-            // If at least one cell is alive, there is no reason to stop the animation
-            if (newStates[i][j]) {
-                allDead = false;
+            // If even a single cell has changed state, the animation has not stalled
+            if (newStates[i][j] != cells[i][j].alive) {
+                stalled = false;
             }
         }
     }
@@ -242,5 +250,18 @@ function updateAndDrawCells ()
         }
     }
 
-    return allDead;
+    return stalled;
+}
+
+
+/**
+ * Draws cells on the canvas.
+ */
+function drawCells ()
+{
+    for (let i = 0; i < floor(CANVAS_WIDTH / CELL_SIZE); i++) {
+        for (let j = 0; j < floor(CANVAS_HEIGHT / CELL_SIZE); j++) {
+            cells[i][j].display();
+        }
+    }
 }
